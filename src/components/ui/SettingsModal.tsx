@@ -8,12 +8,13 @@ interface Props {
   onSave: () => void
   onConnect: () => void
   onDisconnect: () => void
+  onTestBuzzer?: () => void
   isConnected: boolean
   isSupported: boolean
   logs: string[]
 }
 
-export function SettingsModal({ open, onClose, pins, setPins, onSave, onConnect, onDisconnect, isConnected, isSupported, logs }: Props) {
+export function SettingsModal({ open, onClose, pins, setPins, onSave, onConnect, onDisconnect, onTestBuzzer, isConnected, isSupported, logs }: Props) {
   if (!open) return null
 
   return (
@@ -84,11 +85,32 @@ export function SettingsModal({ open, onClose, pins, setPins, onSave, onConnect,
         </div>
 
         {/* Section 4: Buzzer */}
-        <div style={{ background: '#161b22', padding: 10, borderRadius: 10, border: '1px solid #30363d' }}>
+        <div style={{ background: '#161b22', padding: 12, borderRadius: 10, border: '1px solid #30363d', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <label style={{ fontSize: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: 'bold' }}>BUZZER PIN:</span>
             <input type="number" value={pins.BUZZER} onChange={(e) => setPins({ ...pins, BUZZER: Number(e.target.value) })} style={{ ...inputStyle, width: 80 }} />
           </label>
+          <button
+            type="button"
+            disabled={!isConnected}
+            onClick={onTestBuzzer}
+            style={{
+              background: isConnected ? '#e11d48' : '#1e293b',
+              color: isConnected ? '#fff' : '#64748b',
+              border: '1px solid ' + (isConnected ? '#f43f5e' : '#334155'),
+              borderRadius: 6,
+              padding: '6px 12px',
+              fontSize: 11,
+              fontWeight: 'bold',
+              cursor: isConnected ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            {isConnected ? '🔊 Tes Bunyikan Buzzer Fisik Sekarang (Kirim Sinyal B)' : '⚠️ Connect Arduino Dulu Untuk Tes Buzzer Fisik'}
+          </button>
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>

@@ -155,6 +155,37 @@ void timurHijau() {
 
 
 // =====================================================
+// BACA PERINTAH TRIGGER DARI WEB SIMULASI
+// =====================================================
+
+unsigned long waktuBuzzerWeb = 0;
+
+void bunyikanBuzzerFisik(unsigned long durasiMs = 1500) {
+  // Gunakan tone(BUZZER, 2000, durasiMs) bawaan Arduino agar PWM frekuensi 2000Hz
+  // berbunyi nyaring di buzzer piezo pasif tanpa bentrok dengan digitalWrite
+  tone(BUZZER, 2000, durasiMs);
+  waktuBuzzerWeb = millis() + durasiMs;
+  Serial.println(">>> [WEB SIMULASI] TRIGGER BUZZER FISIK AKTIF! <<<");
+}
+
+void matikanBuzzerFisik() {
+  noTone(BUZZER);
+  digitalWrite(BUZZER, LOW);
+  waktuBuzzerWeb = 0;
+}
+
+void periksaPerintahWeb() {
+  while (Serial.available() > 0) {
+    char c = Serial.read();
+    // Mendukung sinyal 'B', 'b', angka '1', atau 'V' (Violation) dari web
+    if (c == 'B' || c == 'b' || c == '1' || c == 'V' || c == 'v') {
+      bunyikanBuzzerFisik(1500); // Bunyikan buzzer fisik selama 1.5 detik
+    }
+  }
+}
+
+
+// =====================================================
 // CEK BARAT + TIMUR
 // UTARA TIDAK DIBACA
 // =====================================================
@@ -237,36 +268,6 @@ void cekPelanggaran() {
 
 
 // =====================================================
-// BACA PERINTAH TRIGGER DARI WEB SIMULASI
-// =====================================================
-
-unsigned long waktuBuzzerWeb = 0;
-
-void bunyikanBuzzerFisik(unsigned long durasiMs = 1200) {
-  tone(BUZZER, 2000);
-  digitalWrite(BUZZER, HIGH);
-  waktuBuzzerWeb = millis() + durasiMs;
-  Serial.println(">>> [WEB SIMULASI] TRIGGER BUZZER FISIK AKTIF! <<<");
-}
-
-void matikanBuzzerFisik() {
-  noTone(BUZZER);
-  digitalWrite(BUZZER, LOW);
-  waktuBuzzerWeb = 0;
-}
-
-void periksaPerintahWeb() {
-  while (Serial.available() > 0) {
-    char c = Serial.read();
-    // Mendukung sinyal 'B', 'b', atau angka '1' dari web
-    if (c == 'B' || c == 'b' || c == '1') {
-      bunyikanBuzzerFisik(1200); // Bunyikan buzzer fisik selama 1.2 detik
-    }
-  }
-}
-
-
-// =====================================================
 // JALANKAN SENSOR SELAMA DURASI
 // =====================================================
 
@@ -280,7 +281,10 @@ void tungguDanDeteksi(unsigned long durasi) {
 
     cekPelanggaran();
 
-    if (millis() >= waktuBuzzerWeb && digitalRead(R_BARAT) == LOW && digitalRead(R_TIMUR) == LOW) {
+    periksaPerintahWeb();
+
+    // Matikan buzzer jika durasi web trigger sudah selesai
+    if (millis() >= waktuBuzzerWeb) {
       matikanBuzzerFisik();
     }
 

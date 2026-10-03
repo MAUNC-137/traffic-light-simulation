@@ -41,7 +41,10 @@ export default function App() {
 
       // 1. Kirim sinyal ke Arduino fisik agar Buzzer Fisik di Pin 32 langsung bunyi!
       if (sendRef.current) {
+        console.log(`⚡ [SmartCross] Pelanggaran ${lane.toUpperCase()} terdeteksi (${source})! Mengirim sinyal buzzer 'B' ke Arduino...`)
         void sendRef.current('B')
+      } else {
+        console.warn('⚠️ [SmartCross] Arduino belum terhubung via WebSerial, buzzer fisik tidak dapat dibunyikan.')
       }
 
       // 2. Bunyikan juga suara alarm buzzer Web Audio API di speaker komputer
@@ -236,6 +239,10 @@ export default function App() {
         onSave={() => sendPinConfig(pins)}
         onConnect={connect}
         onDisconnect={disconnect}
+        onTestBuzzer={() => {
+          console.log('⚡ [SmartCross] Manual Test: Mengirim sinyal buzzer fisik \'B\'...')
+          void send('B')
+        }}
         isConnected={isConnected}
         isSupported={isSupported}
         logs={logs}

@@ -91,16 +91,36 @@ export function useSerial(onLine?: (line: string) => void) {
 
   const send = useCallback(async (msg: string) => {
     if (!portRef.current?.writable) {
-      console.warn('[WebSerial] Belum terhubung ke Arduino, tidak bisa kirim:', msg)
+      console.warn('⚠️ [WebSerial] Belum terhubung ke Arduino, tidak bisa kirim:', msg)
       return
     }
+
+    // Tunggu jika stream sedang locked sebentar (misal ada transmisi lain)
+    let retries = 6
+    while (portRef.current.writable.locked && retries > 0) {
+      await new Promise((r) => setTimeout(r, 30))
+      retries--
+    }
+
+    if (portRef.current.writable.locked) {
+      console.warn('⚠️ [WebSerial] Writable stream masih locked, abaikan pengiriman:', msg)
+      return
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let writer: any = null
     try {
-      const writer = portRef.current.writable.getWriter()
+      writer = portRef.current.writable.getWriter()
       await writer.write(new TextEncoder().encode(msg + '\n'))
-      writer.releaseLock()
       console.log('⚡ [WebSerial] Berhasil kirim sinyal ke Arduino:', msg)
     } catch (e) {
       console.error('❌ [WebSerial] Gagal kirim ke Arduino:', e)
+    } finally {
+      try {
+        writer?.releaseLock()
+      } catch {
+        // ignore
+      }
     }
   }, [])
 
