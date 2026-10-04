@@ -155,35 +155,33 @@ void timurHijau() {
 
 
 // =====================================================
-// BACA PERINTAH TRIGGER DARI WEB SIMULASI
+// TIMER & KONTROL BUZZER
 // =====================================================
 
-unsigned long waktuBuzzerWeb = 0;
+unsigned long buzzerMatiPada = 0;
 
-void bunyikanBuzzerFisik(unsigned long durasiMs = 1500) {
-  // Gunakan tone(BUZZER, 2000, durasiMs) bawaan Arduino agar PWM frekuensi 2000Hz
-  // berbunyi nyaring di buzzer piezo pasif tanpa bentrok dengan digitalWrite
-  tone(BUZZER, 2000, durasiMs);
-  waktuBuzzerWeb = millis() + durasiMs;
-  Serial.println(">>> [WEB SIMULASI] TRIGGER BUZZER FISIK AKTIF! <<<");
+void bunyikanBuzzer(unsigned long durasiMs = 1500) {
+  // Mendukung Active Buzzer (5V DC) dan Passive Buzzer (AC Frequency)
+  digitalWrite(BUZZER, HIGH);
+  tone(BUZZER, 2000);
+  buzzerMatiPada = millis() + durasiMs;
 }
 
-void matikanBuzzerFisik() {
+void matikanBuzzer() {
   noTone(BUZZER);
   digitalWrite(BUZZER, LOW);
-  waktuBuzzerWeb = 0;
 }
 
-void periksaPerintahWeb() {
+void cekSerialInput() {
   while (Serial.available() > 0) {
     char c = Serial.read();
-    // Mendukung sinyal 'B', 'b', angka '1', atau 'V' (Violation) dari web
-    if (c == 'B' || c == 'b' || c == '1' || c == 'V' || c == 'v') {
-      bunyikanBuzzerFisik(1500); // Bunyikan buzzer fisik selama 1.5 detik
+    // Menerima perintah 'B', 'b', '1', atau 'T' (Test) dari Web Dashboard / Simulasi
+    if (c == 'B' || c == 'b' || c == '1' || c == 'T') {
+      bunyikanBuzzer(1500);
+      Serial.println(" | >>> [SIMULASI WEB] PELANGGARAN TERDETEKSI -> BUZZER AKTIF! <<<");
     }
   }
 }
-
 
 // =====================================================
 // CEK BARAT + TIMUR
@@ -226,7 +224,7 @@ void cekPelanggaran() {
 
 
   // ===================================================
-  // PELANGGARAN BARAT
+  // PELANGGARAN BARAT (FISIK)
   // ===================================================
 
   if (digitalRead(R_BARAT) == HIGH &&
@@ -234,12 +232,12 @@ void cekPelanggaran() {
 
     Serial.println(" | !!! PELANGGARAN BARAT !!!");
 
-    tone(BUZZER, 2000);
+    bunyikanBuzzer(1500);
   }
 
 
   // ===================================================
-  // PELANGGARAN TIMUR
+  // PELANGGARAN TIMUR (FISIK)
   // ===================================================
 
   else if (digitalRead(R_TIMUR) == HIGH &&
@@ -247,7 +245,7 @@ void cekPelanggaran() {
 
     Serial.println(" | !!! PELANGGARAN TIMUR !!!");
 
-    tone(BUZZER, 2000);
+    bunyikanBuzzer(1500);
   }
 
 
@@ -259,9 +257,9 @@ void cekPelanggaran() {
 
     Serial.println();
 
-    // Matikan buzzer jika tidak sedang dipicu oleh simulasi web
-    if (millis() >= waktuBuzzerWeb) {
-      matikanBuzzerFisik();
+    // Matikan buzzer HANYA jika timer durasi (baik dari sensor fisik maupun simulasi) sudah selesai
+    if (millis() >= buzzerMatiPada) {
+      matikanBuzzer();
     }
   }
 }
@@ -277,22 +275,14 @@ void tungguDanDeteksi(unsigned long durasi) {
 
   while (millis() - mulai < durasi) {
 
-    periksaPerintahWeb();
-
+    cekSerialInput();
     cekPelanggaran();
 
-    periksaPerintahWeb();
-
-    // Matikan buzzer jika durasi web trigger sudah selesai
-    if (millis() >= waktuBuzzerWeb) {
-      matikanBuzzerFisik();
-    }
-
-    delay(60);
+    delay(100);
   }
 
-  if (millis() >= waktuBuzzerWeb) {
-    matikanBuzzerFisik();
+  if (millis() >= buzzerMatiPada) {
+    matikanBuzzer();
   }
 }
 
@@ -345,7 +335,7 @@ void setup() {
 
   pinMode(BUZZER, OUTPUT);
 
-  noTone(BUZZER);
+  matikanBuzzer();
 
 
   // =========================

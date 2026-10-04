@@ -4,26 +4,22 @@ import { TJunction } from './TJunction'
 import { TrafficLight } from './TrafficLight'
 import { CCTV } from './CCTV'
 import { VehicleSpawner } from './Vehicle'
-import { SimulationCamera } from './SimulationCamera'
 import { ARENA_CONFIG } from '../../config/arena'
-import { useArenaStore } from '../../store/arenaStore'
 import type { PhaseState } from '../../types/pins'
-import type { LaneId } from '../../store/arenaStore'
+import type { LaneId, VehicleState } from '../../store/arenaStore'
 
 interface Props {
   phase: PhaseState
   flashKey: number
-  onSensorCross?: (lane: LaneId, isViolator: boolean) => void
+  onSensorCross?: (lane: LaneId, isViolator: boolean, vehicle: VehicleState) => void
 }
 
 export function Scene({ phase, flashKey, onSensorCross }: Props) {
-  const isSim = useArenaStore((s) => s.isSimulationMode)
-
   return (
     <Canvas
       shadows
       gl={{ preserveDrawingBuffer: true, antialias: true }}
-      camera={isSim ? undefined : { position: [22, 18, 22], fov: 48 }}
+      camera={{ position: [24, 20, 24], fov: 45 }}
       style={{ width: '100%', height: '100%' }}
     >
       <color attach="background" args={['#080a0f']} />
@@ -46,8 +42,6 @@ export function Scene({ phase, flashKey, onSensorCross }: Props) {
 
       <directionalLight position={[-8, 12, -6]} intensity={0.35} />
       <hemisphereLight args={['#b1e1ff', '#1a3302', 0.3]} />
-
-      {isSim ? <SimulationCamera /> : null}
 
       <TJunction />
 
@@ -84,17 +78,18 @@ export function Scene({ phase, flashKey, onSensorCross }: Props) {
         flashKey={flashKey}
       />
 
-      <VehicleSpawner onCross={(lane, isV) => onSensorCross?.(lane, isV)} />
+      <VehicleSpawner onCross={(lane, isV, v) => onSensorCross?.(lane, isV, v)} />
 
-      {isSim ? null : (
-        <OrbitControls
-          enablePan
-          maxPolarAngle={Math.PI / 2.2}
-          minDistance={8}
-          maxDistance={50}
-          target={[0, 1, 0]}
-        />
-      )}
+      {/* OrbitControls aktif selalu sehingga pengguna bisa memutar dan zoom kamera 3D bebas */}
+      <OrbitControls
+        enablePan
+        enableRotate
+        enableZoom
+        maxPolarAngle={Math.PI / 2.15}
+        minDistance={6}
+        maxDistance={70}
+        target={[0, 1, 0]}
+      />
     </Canvas>
   )
 }
