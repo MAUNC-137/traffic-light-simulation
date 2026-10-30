@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -9,17 +9,17 @@ interface CCTVProps {
 }
 
 export function CCTV({ position, target = [0, 0, 0], flashKey }: CCTVProps) {
-  const [flash, setFlash] = useState(false)
   const light = useRef<THREE.PointLight>(null!)
   const camHead = useRef<THREE.Group>(null!)
+  const lensMat = useRef<THREE.MeshStandardMaterial>(null!)
+  const ledMat = useRef<THREE.MeshStandardMaterial>(null!)
+  const flashUntil = useRef(0)
 
   const [x, poleHeight, z] = position
 
   useEffect(() => {
     if (flashKey === 0) return
-    setFlash(true)
-    const t = setTimeout(() => setFlash(false), 700)
-    return () => clearTimeout(t)
+    flashUntil.current = performance.now() + 700
   }, [flashKey])
 
   useEffect(() => {
@@ -29,16 +29,27 @@ export function CCTV({ position, target = [0, 0, 0], flashKey }: CCTVProps) {
   }, [target])
 
   useFrame(({ clock }) => {
-    if (!light.current) return
-    if (!flash) {
-      light.current.intensity = 0
-      return
+    const isFlashing = performance.now() < flashUntil.current
+
+    if (light.current) {
+      if (!isFlashing) {
+        light.current.intensity = 0
+      } else {
+        light.current.intensity = Math.sin(clock.getElapsedTime() * 40) > 0 ? 14 : 0
+      }
     }
-    light.current.intensity = Math.sin(clock.getElapsedTime() * 40) > 0 ? 14 : 0
+
+    if (lensMat.current) {
+      lensMat.current.emissive.set(isFlashing ? '#ffffff' : '#000000')
+      lensMat.current.emissiveIntensity = isFlashing ? 3 : 0
+    }
+
+    if (ledMat.current) {
+      ledMat.current.emissiveIntensity = isFlashing ? 8 : 1
+    }
   })
 
   return (
-    // Base anchored firmly on the ground at [x, 0, z] with rotation [0, 0, 0]
     <group position={[x, 0, z]}>
       {/* 1. Base Plate on Ground */}
       <mesh position={[0, 0.05, 0]} receiveShadow castShadow>
@@ -46,19 +57,19 @@ export function CCTV({ position, target = [0, 0, 0], flashKey }: CCTVProps) {
         <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.6} />
       </mesh>
 
-      {/* 2. Perfectly Vertical Pole (Standing from Y=0 to Y=poleHeight) */}
+      {/* 2. Vertical Pole */}
       <mesh position={[0, poleHeight / 2, 0]} castShadow>
         <cylinderGeometry args={[0.1, 0.14, poleHeight, 16]} />
         <meshStandardMaterial color="#94a3b8" roughness={0.4} metalness={0.4} />
       </mesh>
 
-      {/* 3. Top Junction Box at poleHeight */}
+      {/* 3. Top Junction Box */}
       <mesh position={[0, poleHeight, 0]} castShadow>
         <boxGeometry args={[0.35, 0.35, 0.35]} />
         <meshStandardMaterial color="#64748b" roughness={0.5} metalness={0.3} />
       </mesh>
 
-      {/* 4. Camera Head Group (ONLY this group rotates and executes lookAt) */}
+      {/* 4. Camera Head Group */}
       <group ref={camHead} position={[0, poleHeight, 0]}>
         {/* Forward mounting arm */}
         <mesh position={[0, 0, 0.35]} rotation-x={Math.PI / 2} castShadow>
@@ -68,7 +79,6 @@ export function CCTV({ position, target = [0, 0, 0], flashKey }: CCTVProps) {
 
         {/* Camera Enclosure Body */}
         <group position={[0, 0, 0.6]}>
-          {/* Cylindrical Main Camera Body */}
           <mesh rotation-x={Math.PI / 2} castShadow>
             <cylinderGeometry args={[0.18, 0.2, 0.8, 20]} />
             <meshStandardMaterial color="#0f172a" roughness={0.25} metalness={0.6} />
@@ -84,11 +94,12 @@ export function CCTV({ position, target = [0, 0, 0], flashKey }: CCTVProps) {
           <mesh position={[0, 0, 0.47]}>
             <circleGeometry args={[0.16, 20]} />
             <meshStandardMaterial
+              ref={lensMat}
               color="#001824"
               metalness={0.95}
               roughness={0.05}
-              emissive={flash ? '#ffffff' : '#000000'}
-              emissiveIntensity={flash ? 3 : 0}
+              emissive="#000000"
+              emissiveIntensity={0}
             />
           </mesh>
 
@@ -101,11 +112,23 @@ export function CCTV({ position, target = [0, 0, 0], flashKey }: CCTVProps) {
           {/* Status Recording Red LED */}
           <mesh position={[0.12, 0.08, -0.15]}>
             <sphereGeometry args={[0.04, 12, 12]} />
-            <meshStandardMaterial color="#ff2222" emissive="#ff2222" emissiveIntensity={flash ? 8 : 1} />
+            <meshStandardMaterial
+              ref={ledMat}
+              color="#ff2222"
+              emissive="#ff2222"
+              emissiveIntensity={1}
+            />
           </mesh>
 
-          {/* Violation Flash Light right at lens */}
-          <pointLight ref={light} position={[0, 0, 0.6]} intensity={0} color="#ffffff" distance={25} decay={2} />
+          {/* Violation Flash Light */}
+          <pointLight
+            ref={light}
+            position={[0, 0, 0.6]}
+            intensity={0}
+            color="#ffffff"
+            distance={25}
+            decay={2}
+          />
         </group>
       </group>
     </group>

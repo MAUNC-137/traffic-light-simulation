@@ -8,23 +8,18 @@ export function SimToggle() {
     <button
       type="button"
       onClick={() => setSim(!isSim)}
+      className="btn"
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
         background: isSim ? '#0f293a' : '#111622',
-        color: isSim ? '#38bdf8' : '#94a3b8',
-        border: `1px solid ${isSim ? '#0284c7' : '#1e293b'}`,
-        borderRadius: 8,
-        padding: '7px 14px',
-        fontWeight: 700,
-        fontSize: 12,
-        letterSpacing: '0.04em',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease',
+        color: isSim ? '#38bdf8' : 'var(--text-muted)',
+        borderColor: isSim ? '#0284c7' : 'var(--border-subtle)',
         boxShadow: isSim ? '0 2px 10px rgba(2, 132, 199, 0.25)' : 'none',
       }}
-      title={isSim ? 'Klik untuk mematikan simulasi (beralih ke kontrol Arduino fisik)' : 'Klik untuk mengaktifkan simulasi virtual 3D otomatis'}
+      title={
+        isSim
+          ? 'Klik untuk mematikan simulasi (beralih ke kontrol Arduino fisik)'
+          : 'Klik untuk mengaktifkan simulasi virtual 3D otomatis'
+      }
     >
       <span
         style={{

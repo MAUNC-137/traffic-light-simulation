@@ -1,12 +1,14 @@
 // Web Audio API Buzzer Synthesizer
-// Menghasilkan bunyi alarm buzzer piezo 2000Hz persis seperti tone(BUZZER, 2000) di Arduino
+// Menghasilkan bunyi alarm buzzer piezo 2000Hz persis seperti tone(BUZZER, 2000) pada mikrokontroler Arduino
 
 let audioCtx: AudioContext | null = null
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null
   if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
     if (AudioContextClass) {
       audioCtx = new AudioContextClass()
     }
@@ -17,7 +19,7 @@ function getAudioContext(): AudioContext | null {
   return audioCtx
 }
 
-// Aktifkan audio context pada interaksi pertama user (klik/tap) agar tidak diblokir browser
+// Unlock audio context pada interaksi pertama user (klik/tap/keyboard)
 if (typeof window !== 'undefined') {
   const unlockAudio = () => {
     getAudioContext()
@@ -30,7 +32,7 @@ if (typeof window !== 'undefined') {
 
 /**
  * Membunyikan suara buzzer alarm di speaker komputer/browser
- * @param durationMs Durasi bunyi (default 800ms)
+ * @param durationMs Durasi bunyi (default 900ms)
  * @param frequency Frekuensi nada (default 2000Hz sesuai kode Arduino)
  */
 export function playBuzzerSound(durationMs = 900, frequency = 2000) {
@@ -38,7 +40,7 @@ export function playBuzzerSound(durationMs = 900, frequency = 2000) {
     const ctx = getAudioContext()
     if (!ctx) return
 
-    // Buat pola bunyi beep-beep-beep cepat (3 pulsa alarm) yang dramatis dan realistis
+    // Pola 3 pulsa alarm piezo cepat
     const pulses = 3
     const pulseDuration = durationMs / (pulses * 2 - 1) / 1000
 
@@ -49,14 +51,13 @@ export function playBuzzerSound(durationMs = 900, frequency = 2000) {
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
 
-      // Tipe gelombang square / saw menghasilkan suara buzzer piezo tajam yang keras
+      // Sawtooth waveform menyerupai suara tajam piezo buzzer
       osc.type = 'sawtooth'
       osc.frequency.setValueAtTime(frequency, startTime)
 
-      // Envelope volume
       gain.gain.setValueAtTime(0.001, startTime)
-      gain.gain.exponentialRampToValueAtTime(0.4, startTime + 0.02)
-      gain.gain.setValueAtTime(0.4, stopTime - 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.35, startTime + 0.02)
+      gain.gain.setValueAtTime(0.35, stopTime - 0.02)
       gain.gain.exponentialRampToValueAtTime(0.001, stopTime)
 
       osc.connect(gain)

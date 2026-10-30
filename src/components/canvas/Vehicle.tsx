@@ -2,59 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { ARENA_CONFIG } from '../../config/arena'
 import { useArenaStore, tlOf } from '../../store/arenaStore'
-import type { LaneId, Turn, VehicleState } from '../../store/arenaStore'
-
-const Y = 0.35
-
-function v(x: number, z: number): THREE.Vector3 {
-  return new THREE.Vector3(x, Y, z)
-}
-
-export function buildPath(lane: LaneId, turn: Turn): THREE.CatmullRomCurve3 {
-  if (lane === 'west') {
-    const z0 = ARENA_CONFIG.west.laneCenterZ
-    const stop = ARENA_CONFIG.west.stopLine.position[0]
-    const start = v(-32, z0)
-    const pre = v(stop - 0.6, z0)
-    if (turn === 'straight') return new THREE.CatmullRomCurve3([start, pre, v(10, z0), v(32, z0)])
-    if (turn === 'left') return new THREE.CatmullRomCurve3([start, pre, v(-2, -1), v(-2.25, -14), v(-2.25, -30)])
-    return new THREE.CatmullRomCurve3([start, pre, v(4, 4), v(14, 2.25), v(32, 2.25)])
-  }
-  if (lane === 'east') {
-    const z0 = ARENA_CONFIG.east.laneCenterZ
-    const stop = ARENA_CONFIG.east.stopLine.position[0]
-    const start = v(32, z0)
-    const pre = v(stop + 0.6, z0)
-    if (turn === 'straight') return new THREE.CatmullRomCurve3([start, pre, v(-10, z0), v(-32, z0)])
-    if (turn === 'right') return new THREE.CatmullRomCurve3([start, pre, v(2, 1.2), v(-2.25, -14), v(-2.25, -30)])
-    return new THREE.CatmullRomCurve3([start, pre, v(-4, -4), v(-14, -2.25), v(-32, -2.25)])
-  }
-  const x0 = ARENA_CONFIG.north.laneCenterX
-  const stop = ARENA_CONFIG.north.stopLine.position[2]
-  const start = v(x0, -32)
-  const pre = v(x0, stop - 0.6)
-  if (turn === 'straight') return new THREE.CatmullRomCurve3([start, pre, v(x0, 8), v(x0, 30)])
-  if (turn === 'left') return new THREE.CatmullRomCurve3([start, pre, v(1.5, -1), v(12, -2.25), v(32, -2.25)])
-  return new THREE.CatmullRomCurve3([start, pre, v(3.5, 3), v(-12, 2.25), v(-32, 2.25)])
-}
-
-function stopProgress(curve: THREE.CatmullRomCurve3, lane: LaneId): number {
-  const pts = curve.getPoints(200)
-  let best = 1
-  let bestD = Infinity
-  const sx = lane === 'north' ? ARENA_CONFIG.north.stopLine.position[0] : lane === 'west' ? ARENA_CONFIG.west.stopLine.position[0] : ARENA_CONFIG.east.stopLine.position[0]
-  const sz = lane === 'north' ? ARENA_CONFIG.north.stopLine.position[2] : lane === 'west' ? ARENA_CONFIG.west.stopLine.position[2] : ARENA_CONFIG.east.stopLine.position[2]
-  pts.forEach((p, i) => {
-    const d = Math.hypot(p.x - sx, p.z - sz)
-    if (d < bestD) {
-      bestD = d
-      best = i / (pts.length - 1)
-    }
-  })
-  return best
-}
+import type { LaneId, VehicleState } from '../../store/arenaStore'
+import { buildPath, stopProgress } from '../../config/vehiclePaths'
 
 interface Props extends VehicleState {
   onCross?: (lane: LaneId, isViolator: boolean, vehicle: VehicleState) => void
@@ -125,42 +75,12 @@ export function Vehicle(props: Props) {
           distanceFactor={18}
           zIndexRange={[10, 0]}
         >
-          <div
-            style={{
-              background: 'rgba(15, 23, 42, 0.94)',
-              color: '#f87171',
-              padding: '4px 8px',
-              borderRadius: 6,
-              fontSize: 10.5,
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 800,
-              whiteSpace: 'nowrap',
-              boxShadow: '0 0 16px rgba(239, 68, 68, 0.8)',
-              border: '1.5px solid #ef4444',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 2,
-              pointerEvents: 'none',
-              transform: 'scale(1)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div className="violator-hud-badge">
+            <div className="violator-hud-title">
               <span>🚨 PELANGGAR</span>
-              <span style={{ color: '#f1f5f9' }}>{typeLabel}</span>
+              <span className="violator-hud-type">{typeLabel}</span>
             </div>
-            <div
-              style={{
-                fontSize: 9.5,
-                background: '#000',
-                color: '#38bdf8',
-                padding: '1px 5px',
-                borderRadius: 3,
-                border: '1px solid rgba(56, 189, 248, 0.3)',
-              }}
-            >
-              {plate}
-            </div>
+            <div className="violator-hud-plate">{plate}</div>
           </div>
         </Html>
       )}
@@ -174,7 +94,7 @@ export function Vehicle(props: Props) {
                 new THREE.BoxGeometry(
                   type === 'motor' ? 0.6 : type === 'truck' ? 1.6 : 1.4,
                   type === 'motor' ? 1.3 : type === 'truck' ? 2.0 : 1.3,
-                  type === 'motor' ? 1.6 : type === 'truck' ? 2.8 : type === 'bus' ? 3.8 : 2.5
+                  type === 'motor' ? 1.6 : type === 'truck' ? 2.8 : type === 'bus' ? 3.8 : 2.5,
                 ),
               ]}
             />
@@ -187,15 +107,14 @@ export function Vehicle(props: Props) {
           </mesh>
         </group>
       )}
+
       {type === 'motor' ? (
-        /* ==================== SEPEDA MOTOR ==================== */
+        /* Sepeda Motor */
         <group>
-          {/* Bodi Motor */}
           <mesh castShadow position={[0, 0.4, 0]}>
             <boxGeometry args={[0.32, 0.4, 1.4]} />
             <meshStandardMaterial color={mainColor} roughness={0.3} metalness={0.5} />
           </mesh>
-          {/* Tangki & Stang */}
           <mesh position={[0, 0.65, 0.3]}>
             <boxGeometry args={[0.26, 0.22, 0.4]} />
             <meshStandardMaterial color="#0f172a" roughness={0.2} metalness={0.6} />
@@ -204,7 +123,6 @@ export function Vehicle(props: Props) {
             <cylinderGeometry args={[0.03, 0.03, 0.65, 8]} />
             <meshStandardMaterial color="#334155" metalness={0.8} />
           </mesh>
-          {/* Lampu Depan & Belakang */}
           <mesh position={[0, 0.55, 0.71]}>
             <sphereGeometry args={[0.08, 12, 12]} />
             <meshStandardMaterial color="#fef08a" emissive="#fef08a" emissiveIntensity={3} />
@@ -213,43 +131,44 @@ export function Vehicle(props: Props) {
             <boxGeometry args={[0.12, 0.08, 0.04]} />
             <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
           </mesh>
-          {/* Roda Depan & Belakang */}
           {[0.55, -0.55].map((z, i) => (
             <mesh key={i} position={[0, 0.26, z]} rotation-x={Math.PI / 2}>
               <cylinderGeometry args={[0.26, 0.26, 0.1, 16]} />
               <meshStandardMaterial color="#111" roughness={0.8} />
             </mesh>
           ))}
-          {/* Pengendara (Rider) */}
           <mesh castShadow position={[0, 0.75, -0.1]}>
             <boxGeometry args={[0.3, 0.45, 0.26]} />
             <meshStandardMaterial color="#1e293b" roughness={0.5} />
           </mesh>
-          {/* Helm */}
           <mesh castShadow position={[0, 1.05, -0.1]}>
             <sphereGeometry args={[0.16, 16, 16]} />
-            <meshStandardMaterial color={isViolator ? '#ef4444' : '#f59e0b'} roughness={0.2} metalness={0.3} />
+            <meshStandardMaterial
+              color={isViolator ? '#ef4444' : '#f59e0b'}
+              roughness={0.2}
+              metalness={0.3}
+            />
           </mesh>
         </group>
       ) : type === 'truck' ? (
-        /* ==================== TRUK BOX ==================== */
+        /* Truk Box */
         <group>
-          {/* Kabin Depan */}
           <mesh castShadow position={[0, 0.65, 0.8]}>
             <boxGeometry args={[1.3, 0.9, 1.1]} />
             <meshStandardMaterial color={mainColor} roughness={0.3} metalness={0.4} />
           </mesh>
-          {/* Kaca Depan */}
           <mesh position={[0, 0.8, 1.3]}>
             <boxGeometry args={[1.15, 0.42, 0.12]} />
             <meshStandardMaterial color="#0f172a" roughness={0.1} metalness={0.8} />
           </mesh>
-          {/* Box Kargo Belakang */}
           <mesh castShadow position={[0, 0.95, -0.7]}>
             <boxGeometry args={[1.4, 1.3, 2.2]} />
-            <meshStandardMaterial color={isViolator ? '#b91c1c' : '#f8fafc'} roughness={0.4} metalness={0.2} />
+            <meshStandardMaterial
+              color={isViolator ? '#b91c1c' : '#f8fafc'}
+              roughness={0.4}
+              metalness={0.2}
+            />
           </mesh>
-          {/* Lampu Depan & Belakang */}
           {[-0.45, 0.45].map((x, i) => (
             <mesh key={`hl-${i}`} position={[x, 0.45, 1.36]}>
               <boxGeometry args={[0.2, 0.12, 0.04]} />
@@ -262,11 +181,13 @@ export function Vehicle(props: Props) {
               <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
             </mesh>
           ))}
-          {/* 6 Roda Truk */}
           {[
-            [-0.65, 0.8], [0.65, 0.8],
-            [-0.65, -0.3], [0.65, -0.3],
-            [-0.65, -1.3], [0.65, -1.3],
+            [-0.65, 0.8],
+            [0.65, 0.8],
+            [-0.65, -0.3],
+            [0.65, -0.3],
+            [-0.65, -1.3],
+            [0.65, -1.3],
           ].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.28, z]} rotation-x={Math.PI / 2}>
               <cylinderGeometry args={[0.28, 0.28, 0.22, 16]} />
@@ -275,19 +196,16 @@ export function Vehicle(props: Props) {
           ))}
         </group>
       ) : type === 'bus' ? (
-        /* ==================== MINI BUS ==================== */
+        /* Mini Bus */
         <group>
-          {/* Bodi Bus Panjang */}
           <mesh castShadow position={[0, 0.75, 0]}>
             <boxGeometry args={[1.35, 1.15, 3.4]} />
             <meshStandardMaterial color={mainColor} roughness={0.3} metalness={0.4} />
           </mesh>
-          {/* Jalur Kaca Samping */}
           <mesh position={[0, 0.95, 0]}>
             <boxGeometry args={[1.38, 0.45, 3.1]} />
             <meshStandardMaterial color="#0f172a" roughness={0.2} metalness={0.7} />
           </mesh>
-          {/* Lampu Depan & Belakang */}
           {[-0.5, 0.5].map((x, i) => (
             <mesh key={`hl-${i}`} position={[x, 0.45, 1.72]}>
               <boxGeometry args={[0.2, 0.12, 0.04]} />
@@ -300,10 +218,11 @@ export function Vehicle(props: Props) {
               <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
             </mesh>
           ))}
-          {/* 4 Roda Bus */}
           {[
-            [-0.65, 1.1], [0.65, 1.1],
-            [-0.65, -1.1], [0.65, -1.1],
+            [-0.65, 1.1],
+            [0.65, 1.1],
+            [-0.65, -1.1],
+            [0.65, -1.1],
           ].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.28, z]} rotation-x={Math.PI / 2}>
               <cylinderGeometry args={[0.3, 0.3, 0.22, 16]} />
@@ -312,19 +231,16 @@ export function Vehicle(props: Props) {
           ))}
         </group>
       ) : type === 'suv' ? (
-        /* ==================== MOBIL SUV ==================== */
+        /* Mobil SUV */
         <group>
-          {/* Bodi Bawah SUV */}
           <mesh castShadow position={[0, 0.35, 0]}>
             <boxGeometry args={[1.25, 0.55, 2.3]} />
             <meshStandardMaterial color={mainColor} roughness={0.3} metalness={0.4} />
           </mesh>
-          {/* Kabin Atas SUV */}
           <mesh castShadow position={[0, 0.8, -0.15]}>
             <boxGeometry args={[1.1, 0.52, 1.35]} />
             <meshStandardMaterial color="#0f172a" roughness={0.2} metalness={0.6} />
           </mesh>
-          {/* Lampu Depan & Belakang */}
           {[-0.45, 0.45].map((x, i) => (
             <mesh key={`hl-${i}`} position={[x, 0.35, 1.16]}>
               <boxGeometry args={[0.18, 0.1, 0.04]} />
@@ -337,10 +253,11 @@ export function Vehicle(props: Props) {
               <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
             </mesh>
           ))}
-          {/* 4 Roda SUV */}
           {[
-            [-0.6, 0.75], [0.6, 0.75],
-            [-0.6, -0.75], [0.6, -0.75],
+            [-0.6, 0.75],
+            [0.6, 0.75],
+            [-0.6, -0.75],
+            [0.6, -0.75],
           ].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.26, z]} rotation-x={Math.PI / 2}>
               <cylinderGeometry args={[0.29, 0.29, 0.22, 16]} />
@@ -349,19 +266,16 @@ export function Vehicle(props: Props) {
           ))}
         </group>
       ) : (
-        /* ==================== MOBIL SEDAN (DEFAULT) ==================== */
+        /* Mobil Sedan (Default) */
         <group>
-          {/* Bodi Bawah */}
           <mesh castShadow position={[0, 0.26, 0]}>
             <boxGeometry args={[1.1, 0.42, 2.2]} />
             <meshStandardMaterial color={mainColor} roughness={0.3} metalness={0.4} />
           </mesh>
-          {/* Kabin Kaca */}
           <mesh castShadow position={[0, 0.68, -0.1]}>
             <boxGeometry args={[0.96, 0.44, 1.15]} />
             <meshStandardMaterial color="#0f172a" roughness={0.2} metalness={0.6} />
           </mesh>
-          {/* Lampu Depan & Belakang */}
           {[-0.42, 0.42].map((x, i) => (
             <mesh key={`hl-${i}`} position={[x, 0.28, 1.11]}>
               <boxGeometry args={[0.16, 0.1, 0.04]} />
@@ -374,10 +288,11 @@ export function Vehicle(props: Props) {
               <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
             </mesh>
           ))}
-          {/* 4 Roda Sedan */}
           {[
-            [-0.55, 0.7], [0.55, 0.7],
-            [-0.55, -0.7], [0.55, -0.7],
+            [-0.55, 0.7],
+            [0.55, 0.7],
+            [-0.55, -0.7],
+            [0.55, -0.7],
           ].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.24, z]} rotation-x={Math.PI / 2}>
               <cylinderGeometry args={[0.26, 0.26, 0.18, 16]} />
@@ -400,24 +315,28 @@ export function VehicleSpawner({
   const spawn = useArenaStore((s) => s.spawnVehicle)
   const clear = useArenaStore((s) => s.clearVehicles)
 
+  // Inisialisasi spawn dan interval rutin saat simulasi aktif
   useEffect(() => {
     if (!isSim) {
       clear()
       return
     }
-    // Langsung spawn beberapa jenis kendaraan saat simulasi aktif
+
+    // Spawn 3 kendaraan awal
     spawn({ type: 'sedan', initialProgress: 0.15 })
     spawn({ type: 'motor', initialProgress: 0.25 })
     spawn({ type: 'truck', initialProgress: 0.05 })
 
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       const cur = useArenaStore.getState().vehicles
       if (cur.length < 10) spawn()
     }, 1400)
-    return () => clearInterval(t)
+
+    return () => clearInterval(timer)
   }, [isSim, spawn, clear])
 
   if (!isSim) return null
+
   return (
     <group>
       {vehicles.map((vv) => (

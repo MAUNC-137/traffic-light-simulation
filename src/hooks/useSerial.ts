@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { buildConfigString } from '../types/pins'
 import type { PinConfig } from '../types/pins'
+import type { SerialNavigator, WebSerialPort } from '../types/serial'
 
 export function useSerial(onLine?: (line: string) => void) {
   const [isConnected, setIsConnected] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
   const [lastLine, setLastLine] = useState<string | null>(null)
-  
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const portRef = useRef<any>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const readerRef = useRef<any>(null)
+
+  const portRef = useRef<WebSerialPort | null>(null)
+  const readerRef = useRef<ReadableStreamDefaultReader<string> | null>(null)
   const keepReading = useRef(false)
   const bufferRef = useRef('')
 
@@ -22,8 +21,7 @@ export function useSerial(onLine?: (line: string) => void) {
   const isSupported = typeof navigator !== 'undefined' && 'serial' in navigator
 
   const connect = useCallback(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nav = navigator as any
+    const nav = navigator as SerialNavigator
     if (!nav.serial) {
       alert('Browser tidak mendukung WebSerial. Gunakan Google Chrome atau Microsoft Edge.')
       return
@@ -33,12 +31,16 @@ export function useSerial(onLine?: (line: string) => void) {
       const port = await nav.serial.requestPort()
       await port.open({ baudRate: 9600 })
 
+      if (!port.readable) {
+        throw new Error('Port tidak memiliki readable stream.')
+      }
+
       portRef.current = port
       setIsConnected(true)
       keepReading.current = true
 
       const decoder = new TextDecoderStream()
-      port.readable.pipeTo(decoder.writable)
+      void port.readable.pipeTo(decoder.writable)
       const reader = decoder.readable.getReader()
       readerRef.current = reader
 
@@ -67,7 +69,11 @@ export function useSerial(onLine?: (line: string) => void) {
     } catch (err: unknown) {
       const error = err as { name?: string; message?: string }
       if (error?.name !== 'NotFoundError') {
-        alert('Gagal menghubungkan ke Arduino: ' + (error?.message || String(err)) + '\n\nPastikan Serial Monitor di Arduino IDE sudah DITUTUP.')
+        alert(
+          'Gagal menghubungkan ke Arduino: ' +
+            (error?.message || String(err)) +
+            '\n\nPastikan Serial Monitor di Arduino IDE sudah DITUTUP.',
+        )
       }
       setIsConnected(false)
     }
@@ -85,32 +91,32 @@ export function useSerial(onLine?: (line: string) => void) {
     } catch {
       // ignore
     }
+    readerRef.current = null
     portRef.current = null
     setIsConnected(false)
   }, [])
 
   const send = useCallback(async (msg: string) => {
-    if (!portRef.current?.writable) {
+    const port = portRef.current
+    if (!port?.writable) {
       console.warn('⚠️ [WebSerial] Belum terhubung ke Arduino, tidak bisa kirim:', msg)
       return
     }
 
-    // Tunggu jika stream sedang locked sebentar (misal ada transmisi lain)
     let retries = 6
-    while (portRef.current.writable.locked && retries > 0) {
+    while (port.writable.locked && retries > 0) {
       await new Promise((r) => setTimeout(r, 30))
       retries--
     }
 
-    if (portRef.current.writable.locked) {
+    if (port.writable.locked) {
       console.warn('⚠️ [WebSerial] Writable stream masih locked, abaikan pengiriman:', msg)
       return
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let writer: any = null
+    let writer: WritableStreamDefaultWriter<Uint8Array> | null = null
     try {
-      writer = portRef.current.writable.getWriter()
+      writer = port.writable.getWriter()
       await writer.write(new TextEncoder().encode(msg + '\n'))
       console.log('⚡ [WebSerial] Berhasil kirim sinyal ke Arduino:', msg)
     } catch (e) {
@@ -124,9 +130,12 @@ export function useSerial(onLine?: (line: string) => void) {
     }
   }, [])
 
-  const sendPinConfig = useCallback(async (cfg: PinConfig) => {
-    await send(buildConfigString(cfg))
-  }, [send])
+  const sendPinConfig = useCallback(
+    async (cfg: PinConfig) => {
+      await send(buildConfigString(cfg))
+    },
+    [send],
+  )
 
   useEffect(() => {
     return () => {
